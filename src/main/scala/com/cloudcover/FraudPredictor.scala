@@ -109,14 +109,14 @@ object FraudPredictor extends App {
   val predScoredSparkMLDf = sparkModel.transform(predDf)
 
   //testScoredDf.printSchema()
-  println("*** Confusion Matrix for Test Frame")
+  println("*** Spark ML Results - Confusion Matrix for Test Frame")
   testScoredSparkMLDf
     .groupBy("class", "prediction")
     .count()
     .orderBy("class", "prediction")
     .show(false)
 
-  println("*** Confusion Matrix for Pred Frame")
+  println("*** Spark ML Results - Confusion Matrix for Pred Frame")
   predScoredSparkMLDf
     .groupBy("class", "prediction")
     .count()
