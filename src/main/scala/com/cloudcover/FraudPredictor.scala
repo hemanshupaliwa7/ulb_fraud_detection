@@ -4,6 +4,9 @@ import org.apache.spark.h2o.{H2OConf, H2OContext}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import ai.h2o.sparkling.ml.algos._
+import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.classification.RandomForestClassifier
+import org.apache.spark.ml.feature.VectorAssembler
 
 object FraudPredictor extends App {
 
@@ -52,29 +55,73 @@ object FraudPredictor extends App {
   val predH2ODf = predDf.withColumn("class", expr("cast(class as string)")).persist()
 
   println("*** Distribution of each dataframe")
-  println("trainH2ODf - ")
+  println("train data - ")
   trainH2ODf.groupBy("class").count().show(false)
-  println("testH2ODf - ")
+  println("test data - ")
   testH2ODf.groupBy("class").count().show(false)
-  println("predH2ODf - ")
+  println("pred data - ")
   predH2ODf.groupBy("class").count().show(false)
 
-  val algo = new H2ODRF()
+  println("*** Run H2O Distributed Random Forest")
+  val h2oAlgo = new H2ODRF()
       .setLabelCol("class")
       .setConvertInvalidNumbersToNa(true)
 
-  val model = algo.fit(trainH2ODf)
-  println(s"*** Model Metrics \n ${model.getCurrentMetrics()}")
+  val h2oModel = h2oAlgo.fit(trainH2ODf)
+  println(s"*** Model Metrics \n ${h2oModel.getCurrentMetrics()}")
 
-  val testScoredDf = model.transform(testH2ODf)
-  val predScoredDf = model.transform(predH2ODf)
+  val testScoredH2ODf = h2oModel.transform(testH2ODf)
+  val predScoredH2ODf = h2oModel.transform(predH2ODf)
+
+  //testScoredDf.printSchema()
+  println("*** H2O Results - Confusion Matrix for Test Frame")
+  testScoredH2ODf
+    .groupBy("class", "prediction")
+    .count()
+    .orderBy("class", "prediction")
+    .show(false)
+
+  println("*** H2O Results - Confusion Matrix for Pred Frame")
+  predScoredH2ODf
+    .groupBy("class", "prediction")
+    .count()
+    .orderBy("class", "prediction")
+    .show(false)
+
+  println("*** Run Spark ML Random Forrest")
+  val vectorAssembler = new VectorAssembler()
+    .setInputCols(trainingDf.drop("class").columns)
+    .setOutputCol("assembledFeatures")
+
+  val vectoredTrainDf = vectorAssembler.transform(trainingDf)
+
+  val sparkAlgo = new RandomForestClassifier()
+    .setLabelCol("Class")
+    .setFeaturesCol("assembledFeatures")
+    .setNumTrees(20)
+
+  val pipeline = new Pipeline()
+    .setStages(Array(vectorAssembler, sparkAlgo))
+
+  val sparkModel = pipeline.fit(trainingDf)
+
+  val testScoredSparkMLDf = sparkModel.transform(testDf)
+  val predScoredSparkMLDf = sparkModel.transform(predDf)
 
   //testScoredDf.printSchema()
   println("*** Confusion Matrix for Test Frame")
-  testScoredDf.groupBy("class", "prediction").count().show(false)
+  testScoredSparkMLDf
+    .groupBy("class", "prediction")
+    .count()
+    .orderBy("class", "prediction")
+    .show(false)
 
   println("*** Confusion Matrix for Pred Frame")
-  predScoredDf.groupBy("class", "prediction").count().show(false)
+  predScoredSparkMLDf
+    .groupBy("class", "prediction")
+    .count()
+    .orderBy("class", "prediction")
+    .show(false)
 
   spark.stop()
   h2oContext.stop(stopSparkContext = true)
