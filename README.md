@@ -19,4 +19,4 @@ If you are running on any terminal, then you would need to install sbt and run t
 ```
 sbt assembly
 java -cp root\target\scala-2.12\ulb_fraud_prediction-assembly-1.0.jar com.cloudcover.FraudPredictor
-``
+```
