@@ -3,7 +3,7 @@ import AssemblyKeys._
 lazy val buildSettings = Seq(
   name := "ulb_fraud_prediction",
   version := "1.0",
-  organization := "com.cloudcover",
+  organization := "com.cldcvr",
   scalaVersion := "2.12.10"
 )
 
